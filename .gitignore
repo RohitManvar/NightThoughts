@@ -1,0 +1,35 @@
+# Dependencies
+node_modules/
+
+# Android
+android/build/
+android/app/build/
+android/.gradle/
+android/local.properties
+
+# iOS
+ios/build/
+ios/Pods/
+ios/*.xcworkspace
+
+# Metro
+.metro-health-check*
+
+# Logs
+*.log
+npm-debug.log*
+
+# Environment
+.env
+.env.*
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# Conversation logs
+*.jsonl
+
+# Claude
+.claude/
