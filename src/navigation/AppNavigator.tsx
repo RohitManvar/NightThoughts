@@ -1,25 +1,53 @@
-import React from 'react';
-import { NavigationContainer } from '@react-navigation/native';
+import React, { useEffect } from 'react';
+import {
+  NavigationContainer,
+  createNavigationContainerRef,
+} from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { createStackNavigator } from '@react-navigation/stack';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import HomeScreen from '../screens/HomeScreen';
 import RecordScreen from '../screens/RecordScreen';
 import NotesScreen from '../screens/NotesScreen';
 import PlaybackScreen from '../screens/PlaybackScreen';
-import { RootStackParamList } from '../types';
+import SettingsScreen from '../screens/SettingsScreen';
+import DigestScreen from '../screens/DigestScreen';
+import { RootStackParamList, TabParamList } from '../types';
+import { useTheme } from '../ThemeContext';
+import {
+  onQuickRecord,
+  wasLaunchedForQuickRecord,
+} from '../services/quickRecordService';
 
-const Tab = createBottomTabNavigator();
-const Stack = createStackNavigator<RootStackParamList>();
+const Tab = createBottomTabNavigator<TabParamList>();
+const Stack = createNativeStackNavigator<RootStackParamList>();
+
+const navigationRef = createNavigationContainerRef<RootStackParamList>();
+
+function goToQuickRecord() {
+  if (!navigationRef.isReady()) return;
+  navigationRef.navigate('Tabs', {
+    screen: 'Record',
+    params: { autoStartKey: Date.now() },
+  });
+}
 
 function TabNavigator() {
+  const { colors } = useTheme();
   return (
     <Tab.Navigator
       screenOptions={{
-        tabBarStyle: { backgroundColor: '#0d0d1a', borderTopColor: '#1a1a2e' },
-        tabBarActiveTintColor: '#7c6aff',
-        tabBarInactiveTintColor: '#555577',
+        tabBarStyle: {
+          backgroundColor: colors.card,
+          borderTopColor: colors.border,
+          height: 62,
+          paddingBottom: 8,
+          paddingTop: 6,
+        },
+        tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
+        tabBarActiveTintColor: colors.text,
+        tabBarInactiveTintColor: colors.textFaint,
         headerShown: false,
       }}>
       <Tab.Screen
@@ -49,16 +77,34 @@ function TabNavigator() {
           ),
         }}
       />
+      <Tab.Screen
+        name="Settings"
+        component={SettingsScreen}
+        options={{
+          tabBarIcon: ({ color, size }) => (
+            <Icon name="cog-outline" color={color} size={size} />
+          ),
+        }}
+      />
     </Tab.Navigator>
   );
 }
 
 export default function AppNavigator() {
+  useEffect(() => onQuickRecord(goToQuickRecord), []);
+
   return (
-    <NavigationContainer>
+    <NavigationContainer
+      ref={navigationRef}
+      onReady={() => {
+        wasLaunchedForQuickRecord().then(launched => {
+          if (launched) goToQuickRecord();
+        });
+      }}>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="Home" component={TabNavigator} />
+        <Stack.Screen name="Tabs" component={TabNavigator} />
         <Stack.Screen name="Playback" component={PlaybackScreen} />
+        <Stack.Screen name="Digest" component={DigestScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

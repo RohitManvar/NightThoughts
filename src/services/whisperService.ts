@@ -1,3 +1,4 @@
+import { Platform } from 'react-native';
 import { initWhisper } from 'whisper.rn';
 import RNFS from 'react-native-fs';
 
@@ -6,20 +7,38 @@ interface TranscribeResult {
   language: string;
 }
 
-let whisperContext: Awaited<ReturnType<typeof initWhisper>> | null = null;
+const MODEL_FILE = 'ggml-tiny.bin';
 
-async function getContext() {
-  if (whisperContext) return whisperContext;
+type WhisperContext = Awaited<ReturnType<typeof initWhisper>>;
 
-  // whisper.rn model file must be in android/app/src/main/assets/ (Android)
-  // or in the app bundle (iOS). Use 'ggml-base' for best offline balance.
-  const modelPath =
-    RNFS.MainBundlePath
-      ? `${RNFS.MainBundlePath}/ggml-base.bin`        // iOS
-      : 'ggml-base.bin';                               // Android (assets)
+// Cache the in-flight promise, not just the resolved value, so concurrent
+// first calls share a single initWhisper instead of loading the model twice.
+let contextPromise: Promise<WhisperContext> | null = null;
 
-  whisperContext = await initWhisper({ filePath: modelPath });
-  return whisperContext;
+function getContext(): Promise<WhisperContext> {
+  if (!contextPromise) {
+    contextPromise = (async () => {
+      if (Platform.OS === 'android') {
+        // Model ships inside the APK at android/app/src/main/assets/ggml-tiny.bin.
+        // whisper.rn cannot read APK assets directly, so copy it to the app's
+        // files directory on first run.
+        const localPath = `${RNFS.DocumentDirectoryPath}/${MODEL_FILE}`;
+        const exists = await RNFS.exists(localPath);
+        if (!exists) {
+          await RNFS.copyFileAssets(MODEL_FILE, localPath);
+        }
+        return initWhisper({ filePath: localPath });
+      }
+      return initWhisper({
+        filePath: `${RNFS.MainBundlePath}/${MODEL_FILE}`,
+      });
+    })().catch(err => {
+      // Don't cache a failed init — let the next call retry.
+      contextPromise = null;
+      throw err;
+    });
+  }
+  return contextPromise;
 }
 
 export async function transcribeAudio(
@@ -28,9 +47,7 @@ export async function transcribeAudio(
   const ctx = await getContext();
 
   const { promise } = ctx.transcribe(audioPath, {
-    language: 'auto',       // auto-detect language
-    maxLen: 1,
-    tokenTimestamps: false,
+    language: 'auto',
   });
 
   const result = await promise;
@@ -40,8 +57,11 @@ export async function transcribeAudio(
     .join(' ')
     .trim();
 
+  const detected = (result as any).language;
   return {
-    text: text || '',
-    language: result.isAborted ? 'unknown' : (result as any).language ?? 'auto',
+    text,
+    // 'auto' is the request mode, not a real result — treat a missing or
+    // unresolved language as 'unknown' so the UI can suppress the lang tag.
+    language: detected && detected !== 'auto' ? detected : 'unknown',
   };
 }

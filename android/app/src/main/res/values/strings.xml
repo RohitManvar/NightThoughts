@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">NightThoughts</string>
+    <string name="tile_record_label">Record thought</string>
 </resources>

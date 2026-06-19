@@ -1,0 +1,46 @@
+package com.nightthoughts
+
+import android.app.PendingIntent
+import android.content.Intent
+import android.os.Build
+import android.service.quicksettings.Tile
+import android.service.quicksettings.TileService
+import androidx.annotation.RequiresApi
+
+/**
+ * Quick Settings tile that launches the app straight into recording,
+ * including from the lock screen (MainActivity sets showWhenLocked when
+ * launched with ACTION_QUICK_RECORD).
+ */
+@RequiresApi(Build.VERSION_CODES.N)
+class RecordTileService : TileService() {
+
+  override fun onStartListening() {
+    super.onStartListening()
+    qsTile?.let {
+      it.state = Tile.STATE_INACTIVE
+      it.updateTile()
+    }
+  }
+
+  override fun onClick() {
+    super.onClick()
+    val intent = Intent(this, MainActivity::class.java).apply {
+      action = QuickRecordModule.ACTION_QUICK_RECORD
+      addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+    }
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+      // API 34+ only accepts a PendingIntent here.
+      val pendingIntent = PendingIntent.getActivity(
+          this,
+          0,
+          intent,
+          PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+      )
+      startActivityAndCollapse(pendingIntent)
+    } else {
+      @Suppress("DEPRECATION")
+      startActivityAndCollapse(intent)
+    }
+  }
+}
