@@ -37,20 +37,30 @@ class MainActivity : ReactActivity() {
 
   /**
    * When launched from the Quick Settings tile, show over the lock screen and
-   * wake the display so the user can record without unlocking.
+   * wake the display so the user can record without unlocking. Any other
+   * launch must explicitly turn this back off — MainActivity is singleTask,
+   * so the same instance (and its show-when-locked flag) survives across
+   * launches, and a normal launch must never inherit it.
    */
   private fun handleQuickRecordIntent(intent: Intent?) {
-    if (intent?.action != QuickRecordModule.ACTION_QUICK_RECORD) return
+    val isQuickRecord = intent?.action == QuickRecordModule.ACTION_QUICK_RECORD
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
-      setShowWhenLocked(true)
-      setTurnScreenOn(true)
+      setShowWhenLocked(isQuickRecord)
+      if (isQuickRecord) setTurnScreenOn(true)
     } else {
       @Suppress("DEPRECATION")
-      window.addFlags(
-          WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
-              WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON,
-      )
+      if (isQuickRecord) {
+        window.addFlags(
+            WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
+                WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON,
+        )
+      } else {
+        window.clearFlags(
+            WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
+                WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON,
+        )
+      }
     }
-    QuickRecordModule.handleIntent(intent)
+    if (isQuickRecord) QuickRecordModule.handleIntent(intent)
   }
 }
